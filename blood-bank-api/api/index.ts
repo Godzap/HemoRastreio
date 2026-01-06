@@ -7,46 +7,39 @@ import { Request, Response } from 'express';
 let app: any;
 
 async function bootstrap() {
-    if (!app) {
-        app = await NestFactory.create(AppModule);
+    try {
+        if (!app) {
+            app = await NestFactory.create(AppModule);
 
-        app.enableCors({
-            origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-                const allowedOrigins = [
-                    'http://localhost:5173',
-                    'http://localhost:3000',
-                    process.env.FRONTEND_URL,
-                ].filter(Boolean);
+            app.enableCors({
+                origin: true, // Allow all origins
+                credentials: true,
+                methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+                allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+            });
 
-                if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
-                    callback(null, true);
-                } else {
-                    callback(null, false);
-                }
-            },
-            credentials: true,
-            methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-            allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-        });
+            app.useGlobalPipes(
+                new ValidationPipe({
+                    whitelist: true,
+                    forbidNonWhitelisted: true,
+                    transform: true,
+                    transformOptions: {
+                        enableImplicitConversion: true,
+                    },
+                }),
+            );
 
-        app.useGlobalPipes(
-            new ValidationPipe({
-                whitelist: true,
-                forbidNonWhitelisted: true,
-                transform: true,
-                transformOptions: {
-                    enableImplicitConversion: true,
-                },
-            }),
-        );
+            app.setGlobalPrefix('api', {
+                exclude: [{ path: '/', method: RequestMethod.GET }],
+            });
 
-        app.setGlobalPrefix('api', {
-            exclude: [{ path: '/', method: RequestMethod.GET }],
-        });
-
-        await app.init();
+            await app.init();
+        }
+        return app;
+    } catch (error) {
+        console.error('Bootstrap Error:', error);
+        throw error;
     }
-    return app;
 }
 
 export default async function handler(req: Request, res: Response) {
