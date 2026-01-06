@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma';
 import { CreateLaboratoryDto, UpdateLaboratoryDto } from './dto';
-import { Laboratory } from '@prisma/client';
+import { Laboratory, Prisma } from '@prisma/client';
 
 @Injectable()
 export class LaboratoryService {
@@ -49,7 +49,7 @@ export class LaboratoryService {
                 email: dto.email,
                 licenseNumber: dto.licenseNumber,
                 timezone: dto.timezone ?? 'America/Sao_Paulo',
-                settings: dto.settings ?? {},
+                settings: (dto.settings ?? {}) as Prisma.InputJsonValue,
             },
         });
     }
@@ -67,7 +67,7 @@ export class LaboratoryService {
                 ...(dto.licenseNumber !== undefined && { licenseNumber: dto.licenseNumber }),
                 ...(dto.timezone && { timezone: dto.timezone }),
                 ...(dto.isActive !== undefined && { isActive: dto.isActive }),
-                ...(dto.settings && { settings: dto.settings }),
+                ...(dto.settings && { settings: dto.settings as Prisma.InputJsonValue }),
             },
         });
     }
@@ -104,7 +104,6 @@ export class LaboratoryService {
             this.prisma.storagePosition.aggregate({
                 where: { laboratoryId },
                 _count: { id: true },
-                _sum: { isOccupied: true },
             }),
             this.prisma.transferRequest.count({
                 where: {

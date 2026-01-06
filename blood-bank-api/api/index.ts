@@ -2,7 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { ValidationPipe } from '@nestjs/common';
 
-export default async function handler(req, res) {
+import { Request, Response } from 'express';
+
+export default async function handler(req: Request, res: Response) {
     const app = await NestFactory.create(AppModule);
 
     // Configurações globais (CORS, Pipes, etc) devem ser replicadas aqui
