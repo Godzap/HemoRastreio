@@ -24,6 +24,7 @@ export class AuthService {
     }
 
     async validateUser(username: string, password: string): Promise<AuthenticatedUser | null> {
+        console.log(`[AuthDebug] Attempting login for: ${username}`);
         const user = await this.prisma.user.findFirst({
             where: {
                 OR: [
@@ -50,21 +51,28 @@ export class AuthService {
         });
 
         if (!user) {
+            console.log('[AuthDebug] User not found in database');
             return null;
         }
 
+        console.log(`[AuthDebug] User found: ${user.id}, Active: ${user.isActive}`);
+
         // Check if account is locked
         if (user.lockedUntil && user.lockedUntil > new Date()) {
+            console.log('[AuthDebug] Account is locked');
             throw new UnauthorizedException('Account is locked. Please try again later.');
         }
 
         // Check if account is active
         if (!user.isActive) {
+            console.log('[AuthDebug] Account is inactive');
             throw new UnauthorizedException('Account is deactivated. Please contact administrator.');
         }
 
         // Verify password
+        console.log(`[AuthDebug] Verifying password. Hash prefix: ${user.passwordHash.substring(0, 7)}...`);
         const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
+        console.log(`[AuthDebug] Password valid: ${isPasswordValid}`);
 
         if (!isPasswordValid) {
             // Increment failed login attempts
