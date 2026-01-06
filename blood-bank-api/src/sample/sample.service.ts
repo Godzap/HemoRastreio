@@ -4,7 +4,7 @@ import { CreateSampleDto, UpdateSampleDto, MoveSampleDto, ChangeStatusDto, Sampl
 import { Sample, SampleStatus, SampleMovement, Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 
-interface PaginatedResult<T> {
+export interface PaginatedResult<T> {
     data: T[];
     total: number;
     page: number;

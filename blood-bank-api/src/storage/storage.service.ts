@@ -8,11 +8,11 @@ import {
 } from './dto';
 import { StorageRoom, Freezer, Shelf, Box, StoragePosition } from '@prisma/client';
 
-interface BoxWithPositions extends Box {
+export interface BoxWithPositions extends Box {
     positions: (StoragePosition & { sample?: { id: string; barcode: string; patientCode: string } | null })[];
 }
 
-interface StorageOccupancy {
+export interface StorageOccupancy {
     total: number;
     occupied: number;
     blocked: number;

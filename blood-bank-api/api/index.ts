@@ -11,7 +11,7 @@ export default async function handler(req: Request, res: Response) {
     // ou extraídas para uma função de setup compartilhada
 
     app.enableCors({
-        origin: (origin, callback) => {
+        origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
             const allowedOrigins = [
                 'http://localhost:5173',
                 'http://localhost:3000',

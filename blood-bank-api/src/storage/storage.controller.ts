@@ -8,7 +8,7 @@ import {
     BlockPositionDto,
 } from './dto';
 import { JwtAuthGuard, RolesGuard, Roles, CurrentUser } from '../auth';
-import { AuthenticatedUser } from '../auth/interfaces';
+import type { AuthenticatedUser } from '../auth/interfaces';
 
 @Controller('storage')
 @UseGuards(JwtAuthGuard, RolesGuard)
