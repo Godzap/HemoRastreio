@@ -1,0 +1,470 @@
+// Blood Bank Inventory & Traceability System
+// Multi-tenant database schema with laboratory isolation
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==========================================
+// ORGANIZATION & LABORATORY (MULTI-TENANT)
+// ==========================================
+
+model Organization {
+  id           String       @id @default(uuid()) @db.Uuid
+  name         String       @db.VarChar(255)
+  code         String       @unique @db.VarChar(50)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  laboratories Laboratory[]
+
+  @@map("organizations")
+}
+
+model Laboratory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @db.Uuid
+  name           String   @db.VarChar(255)
+  code           String   @unique @db.VarChar(50)
+  address        String?  @db.Text
+  phone          String?  @db.VarChar(50)
+  email          String?  @db.VarChar(255)
+  licenseNumber  String?  @db.VarChar(100)
+  timezone       String   @default("America/Sao_Paulo") @db.VarChar(100)
+  isActive       Boolean  @default(true)
+  settings       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization? @relation(fields: [organizationId], references: [id])
+
+  // Relations
+  users                   User[]
+  samples                 Sample[]
+  sampleMovements         SampleMovement[]
+  storageRooms            StorageRoom[]
+  freezers                Freezer[]
+  shelves                 Shelf[]
+  boxes                   Box[]
+  storagePositions        StoragePosition[]
+  transferRequestsFrom    TransferRequest[] @relation("FromLaboratory")
+  transferRequestsTo      TransferRequest[] @relation("ToLaboratory")
+  auditLogs               AuditLog[]
+  userRoles               UserRole[]
+
+  @@map("laboratories")
+}
+
+// ==========================================
+// ROLES & PERMISSIONS
+// ==========================================
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isGlobal    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  permissions RolePermission[]
+  userRoles   UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique @db.VarChar(100)
+  name        String   @db.VarChar(255)
+  module      String   @db.VarChar(100)
+  description String?  @db.Text
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @db.Uuid
+  permissionId String @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ==========================================
+// USERS & AUTHENTICATION
+// ==========================================
+
+model User {
+  id                   String    @id @default(uuid()) @db.Uuid
+  laboratoryId         String?   @db.Uuid
+  email                String    @unique @db.VarChar(255)
+  username             String    @unique @db.VarChar(100)
+  passwordHash         String    @db.VarChar(255)
+  fullName             String    @db.VarChar(255)
+  phone                String?   @db.VarChar(50)
+  registrationNumber   String?   @db.VarChar(100)
+  isActive             Boolean   @default(true)
+  isGlobalAdmin        Boolean   @default(false)
+  lastLoginAt          DateTime?
+  passwordChangedAt    DateTime?
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  deletedAt            DateTime?
+
+  laboratory Laboratory? @relation(fields: [laboratoryId], references: [id])
+
+  // Relations
+  userRoles               UserRole[]
+  sessions                UserSession[]
+  collectedSamples        Sample[]           @relation("CollectedBy")
+  sampleMovements         SampleMovement[]
+  transferRequestsCreated TransferRequest[]  @relation("RequestedBy")
+  transferRequestsApproved TransferRequest[] @relation("ApprovedBy")
+  transferRequestsShipped TransferRequest[]  @relation("ShippedBy")
+  transferRequestsReceived TransferRequest[] @relation("ReceivedBy")
+  grantedRoles            UserRole[]         @relation("GrantedBy")
+  auditLogs               AuditLog[]
+
+  @@index([laboratoryId])
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+model UserRole {
+  userId       String   @db.Uuid
+  roleId       String   @db.Uuid
+  laboratoryId String   @db.Uuid
+  grantedById  String?  @db.Uuid
+  grantedAt    DateTime @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role        @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  laboratory Laboratory  @relation(fields: [laboratoryId], references: [id], onDelete: Cascade)
+  grantedBy  User?       @relation("GrantedBy", fields: [grantedById], references: [id])
+
+  @@id([userId, roleId, laboratoryId])
+  @@map("user_roles")
+}
+
+model UserSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @db.VarChar(255)
+  ipAddress String?   @db.VarChar(45)
+  userAgent String?   @db.Text
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("user_sessions")
+}
+
+// ==========================================
+// SAMPLE TYPES
+// ==========================================
+
+model SampleType {
+  id                  String   @id @default(uuid()) @db.Uuid
+  code                String   @unique @db.VarChar(50)
+  name                String   @db.VarChar(100)
+  description         String?  @db.Text
+  storageRequirements Json?
+  defaultExpirationDays Int?
+
+  samples Sample[]
+
+  @@map("sample_types")
+}
+
+// ==========================================
+// SAMPLES & TRACEABILITY
+// ==========================================
+
+model Sample {
+  id                 String    @id @default(uuid()) @db.Uuid
+  laboratoryId       String    @db.Uuid
+  barcode            String    @unique @db.VarChar(100)
+  externalId         String?   @db.VarChar(100)
+  patientCode        String    @db.VarChar(100)
+  requestCode        String?   @db.VarChar(100)
+  sampleTypeId       String    @db.Uuid
+  volumeMl           Decimal?  @db.Decimal(10, 2)
+  collectionDatetime DateTime
+  collectedByUserId  String    @db.Uuid
+  status             SampleStatus @default(COLLECTED)
+  currentPositionId  String?   @db.Uuid
+  expirationDate     DateTime?
+  notes              String?   @db.Text
+  metadata           Json      @default("{}")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  laboratory      Laboratory       @relation(fields: [laboratoryId], references: [id])
+  sampleType      SampleType       @relation(fields: [sampleTypeId], references: [id])
+  collectedBy     User             @relation("CollectedBy", fields: [collectedByUserId], references: [id])
+  currentPosition StoragePosition? @relation(fields: [currentPositionId], references: [id])
+
+  movements     SampleMovement[]
+  transferItems TransferItem[]
+
+  @@index([laboratoryId])
+  @@index([barcode])
+  @@index([patientCode])
+  @@index([status])
+  @@index([expirationDate])
+  @@map("samples")
+}
+
+enum SampleStatus {
+  COLLECTED
+  STORED
+  IN_TRANSFER
+  UNDER_ANALYSIS
+  ARCHIVED
+  DISCARDED
+}
+
+model SampleMovement {
+  id                String       @id @default(uuid()) @db.Uuid
+  sampleId          String       @db.Uuid
+  laboratoryId      String       @db.Uuid
+  fromPositionId    String?      @db.Uuid
+  toPositionId      String?      @db.Uuid
+  previousStatus    SampleStatus?
+  newStatus         SampleStatus
+  performedByUserId String       @db.Uuid
+  performedAt       DateTime     @default(now())
+  reason            String?      @db.VarChar(255)
+  notes             String?      @db.Text
+  createdAt         DateTime     @default(now())
+
+  sample       Sample           @relation(fields: [sampleId], references: [id])
+  laboratory   Laboratory       @relation(fields: [laboratoryId], references: [id])
+  fromPosition StoragePosition? @relation("MovementFrom", fields: [fromPositionId], references: [id])
+  toPosition   StoragePosition? @relation("MovementTo", fields: [toPositionId], references: [id])
+  performedBy  User             @relation(fields: [performedByUserId], references: [id])
+
+  @@index([sampleId])
+  @@index([laboratoryId])
+  @@index([performedAt])
+  @@map("sample_movements")
+}
+
+// ==========================================
+// STORAGE HIERARCHY
+// ==========================================
+
+model StorageRoom {
+  id           String   @id @default(uuid()) @db.Uuid
+  laboratoryId String   @db.Uuid
+  name         String   @db.VarChar(100)
+  code         String   @db.VarChar(50)
+  description  String?  @db.Text
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  laboratory Laboratory @relation(fields: [laboratoryId], references: [id])
+  freezers   Freezer[]
+
+  @@unique([laboratoryId, code])
+  @@index([laboratoryId])
+  @@map("storage_rooms")
+}
+
+model Freezer {
+  id               String   @id @default(uuid()) @db.Uuid
+  storageRoomId    String   @db.Uuid
+  laboratoryId     String   @db.Uuid
+  name             String   @db.VarChar(100)
+  code             String   @db.VarChar(50)
+  equipmentType    String?  @db.VarChar(50)
+  targetTemperature Decimal? @db.Decimal(5, 2)
+  minTemperature   Decimal? @db.Decimal(5, 2)
+  maxTemperature   Decimal? @db.Decimal(5, 2)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  storageRoom StorageRoom @relation(fields: [storageRoomId], references: [id])
+  laboratory  Laboratory  @relation(fields: [laboratoryId], references: [id])
+  shelves     Shelf[]
+
+  @@unique([laboratoryId, code])
+  @@index([laboratoryId])
+  @@map("freezers")
+}
+
+model Shelf {
+  id             String   @id @default(uuid()) @db.Uuid
+  freezerId      String   @db.Uuid
+  laboratoryId   String   @db.Uuid
+  name           String   @db.VarChar(100)
+  positionNumber Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  freezer    Freezer    @relation(fields: [freezerId], references: [id])
+  laboratory Laboratory @relation(fields: [laboratoryId], references: [id])
+  boxes      Box[]
+
+  @@index([laboratoryId])
+  @@map("shelves")
+}
+
+model Box {
+  id            String   @id @default(uuid()) @db.Uuid
+  shelfId       String   @db.Uuid
+  laboratoryId  String   @db.Uuid
+  name          String   @db.VarChar(100)
+  code          String   @db.VarChar(50)
+  boxType       String?  @db.VarChar(50)
+  rows          Int      @default(9)
+  columns       Int      @default(9)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  shelf      Shelf             @relation(fields: [shelfId], references: [id])
+  laboratory Laboratory        @relation(fields: [laboratoryId], references: [id])
+  positions  StoragePosition[]
+
+  @@unique([laboratoryId, code])
+  @@index([laboratoryId])
+  @@map("boxes")
+}
+
+model StoragePosition {
+  id            String   @id @default(uuid()) @db.Uuid
+  boxId         String   @db.Uuid
+  laboratoryId  String   @db.Uuid
+  rowNumber     Int
+  columnNumber  Int
+  positionLabel String?  @db.VarChar(20)
+  isOccupied    Boolean  @default(false)
+  isBlocked     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  box         Box        @relation(fields: [boxId], references: [id])
+  laboratory  Laboratory @relation(fields: [laboratoryId], references: [id])
+  samples     Sample[]
+  movementsFrom SampleMovement[] @relation("MovementFrom")
+  movementsTo   SampleMovement[] @relation("MovementTo")
+
+  @@unique([boxId, rowNumber, columnNumber])
+  @@index([laboratoryId])
+  @@map("storage_positions")
+}
+
+// ==========================================
+// INTER-LABORATORY TRANSFERS
+// ==========================================
+
+model TransferRequest {
+  id                 String         @id @default(uuid()) @db.Uuid
+  requestNumber      String         @unique @db.VarChar(50)
+  fromLaboratoryId   String         @db.Uuid
+  toLaboratoryId     String         @db.Uuid
+  status             TransferStatus @default(PENDING)
+  requestedByUserId  String         @db.Uuid
+  requestedAt        DateTime       @default(now())
+  approvedByUserId   String?        @db.Uuid
+  approvedAt         DateTime?
+  approvalNotes      String?        @db.Text
+  shippedAt          DateTime?
+  shippedByUserId    String?        @db.Uuid
+  trackingNumber     String?        @db.VarChar(100)
+  receivedAt         DateTime?
+  receivedByUserId   String?        @db.Uuid
+  receptionNotes     String?        @db.Text
+  reason             String         @db.Text
+  priority           String         @default("normal") @db.VarChar(20)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  fromLaboratory Laboratory @relation("FromLaboratory", fields: [fromLaboratoryId], references: [id])
+  toLaboratory   Laboratory @relation("ToLaboratory", fields: [toLaboratoryId], references: [id])
+  requestedBy    User       @relation("RequestedBy", fields: [requestedByUserId], references: [id])
+  approvedBy     User?      @relation("ApprovedBy", fields: [approvedByUserId], references: [id])
+  shippedBy      User?      @relation("ShippedBy", fields: [shippedByUserId], references: [id])
+  receivedBy     User?      @relation("ReceivedBy", fields: [receivedByUserId], references: [id])
+
+  items TransferItem[]
+
+  @@index([fromLaboratoryId])
+  @@index([toLaboratoryId])
+  @@index([status])
+  @@map("transfer_requests")
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  IN_TRANSIT
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+model TransferItem {
+  id                   String  @id @default(uuid()) @db.Uuid
+  transferRequestId    String  @db.Uuid
+  sampleId             String  @db.Uuid
+  status               String  @default("pending") @db.VarChar(50)
+  conditionAtShipping  String? @db.VarChar(50)
+  notesAtShipping      String? @db.Text
+  conditionAtReception String? @db.VarChar(50)
+  notesAtReception     String? @db.Text
+  createdAt            DateTime @default(now())
+
+  transferRequest TransferRequest @relation(fields: [transferRequestId], references: [id])
+  sample          Sample          @relation(fields: [sampleId], references: [id])
+
+  @@index([transferRequestId])
+  @@map("transfer_items")
+}
+
+// ==========================================
+// AUDIT LOGGING
+// ==========================================
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  laboratoryId  String?  @db.Uuid
+  userId        String?  @db.Uuid
+  entityType    String   @db.VarChar(100)
+  entityId      String   @db.Uuid
+  action        String   @db.VarChar(50)
+  oldValues     Json?
+  newValues     Json?
+  changedFields String[]
+  ipAddress     String?  @db.VarChar(45)
+  userAgent     String?  @db.Text
+  requestId     String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  laboratory Laboratory? @relation(fields: [laboratoryId], references: [id])
+  user       User?       @relation(fields: [userId], references: [id])
+
+  @@index([laboratoryId, createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}

@@ -1,0 +1,14 @@
+// Prisma configuration for Supabase + Vercel deployment
+import "dotenv/config";
+import { defineConfig } from "prisma/config";
+
+export default defineConfig({
+  schema: "prisma/schema.prisma",
+  migrations: {
+    path: "prisma/migrations",
+  },
+  datasource: {
+    // Use pooled connection for general operations
+    url: process.env.DATABASE_URL,
+  },
+});
