@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, RequestMethod } from '@nestjs/common';
 
 import { Request, Response } from 'express';
 
@@ -40,7 +40,9 @@ export default async function handler(req: Request, res: Response) {
         }),
     );
 
-    app.setGlobalPrefix('api');
+    app.setGlobalPrefix('api', {
+        exclude: [{ path: '/', method: RequestMethod.GET }],
+    });
 
     await app.init();
 
