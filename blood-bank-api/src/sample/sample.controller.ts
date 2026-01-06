@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } f
 import { SampleService } from './sample.service';
 import { CreateSampleDto, UpdateSampleDto, MoveSampleDto, ChangeStatusDto, SampleQueryDto } from './dto';
 import { JwtAuthGuard, RolesGuard, Roles, Permissions, CurrentUser } from '../auth';
-import { AuthenticatedUser } from '../auth/interfaces';
+import type { AuthenticatedUser } from '../auth/interfaces';
 
 @Controller('samples')
 @UseGuards(JwtAuthGuard, RolesGuard)

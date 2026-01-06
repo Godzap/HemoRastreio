@@ -4,7 +4,7 @@ import { LoginDto, RefreshTokenDto, ChangePasswordDto } from './dto';
 import { Public } from './decorators';
 import { CurrentUser } from './decorators';
 import { JwtAuthGuard } from './guards';
-import { LoginResponse, TokenPair, AuthenticatedUser } from './interfaces';
+import type { LoginResponse, TokenPair, AuthenticatedUser } from './interfaces';
 
 @Controller('auth')
 export class AuthController {

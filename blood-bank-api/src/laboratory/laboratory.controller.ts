@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards } from '@n
 import { LaboratoryService } from './laboratory.service';
 import { CreateLaboratoryDto, UpdateLaboratoryDto } from './dto';
 import { JwtAuthGuard, RolesGuard, Roles, CurrentUser } from '../auth';
-import { AuthenticatedUser } from '../auth/interfaces';
+import type { AuthenticatedUser } from '../auth/interfaces';
 
 @Controller('laboratories')
 @UseGuards(JwtAuthGuard, RolesGuard)
