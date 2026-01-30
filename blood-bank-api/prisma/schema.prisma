@@ -212,6 +212,10 @@ model Sample {
   currentPositionId  String?   @db.Uuid
   expirationDate     DateTime?
   notes              String?   @db.Text
+  isMotherSample     Boolean   @default(false)
+  childCount         Int       @default(0)
+  parentSampleId     String?   @db.Uuid
+  childNumber        Int?      // For child samples: 1, 2, 3, etc.
   metadata           Json      @default("{}")
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
@@ -221,6 +225,8 @@ model Sample {
   sampleType      SampleType       @relation(fields: [sampleTypeId], references: [id])
   collectedBy     User             @relation("CollectedBy", fields: [collectedByUserId], references: [id])
   currentPosition StoragePosition? @relation(fields: [currentPositionId], references: [id])
+  parentSample    Sample?          @relation("MotherChildSamples", fields: [parentSampleId], references: [id])
+  childSamples    Sample[]         @relation("MotherChildSamples")
 
   movements     SampleMovement[]
   transferItems TransferItem[]

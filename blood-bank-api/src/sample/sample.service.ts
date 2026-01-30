@@ -153,8 +153,12 @@ export class SampleService {
             }
         }
 
+        const isMotherSample = dto.isMotherSample || false;
+        const childCount = isMotherSample && dto.childCount ? dto.childCount : 0;
+
         // Create sample with movement record
         const sample = await this.prisma.$transaction(async (tx) => {
+            // Create the main sample (mother or regular)
             const newSample = await tx.sample.create({
                 data: {
                     barcode: dto.barcode,
@@ -170,6 +174,8 @@ export class SampleService {
                     expirationDate: dto.expirationDate ? new Date(dto.expirationDate) : null,
                     notes: dto.notes,
                     status: dto.currentPositionId ? SampleStatus.STORED : SampleStatus.COLLECTED,
+                    isMotherSample: isMotherSample,
+                    childCount: childCount,
                 },
                 include: {
                     sampleType: true,
@@ -185,7 +191,7 @@ export class SampleService {
                     toPositionId: dto.currentPositionId,
                     newStatus: newSample.status,
                     performedByUserId: userId,
-                    reason: 'Sample registered',
+                    reason: isMotherSample ? 'Mother sample registered' : 'Sample registered',
                 },
             });
 
@@ -197,6 +203,45 @@ export class SampleService {
                 });
             }
 
+            // If mother sample, create child samples
+            if (isMotherSample && childCount > 0) {
+                for (let i = 1; i <= childCount; i++) {
+                    const childBarcode = `${dto.barcode}-F${String(i).padStart(2, '0')}`;
+
+                    const childSample = await tx.sample.create({
+                        data: {
+                            barcode: childBarcode,
+                            externalId: dto.externalId,
+                            patientCode: dto.patientCode,
+                            requestCode: dto.requestCode,
+                            sampleTypeId: dto.sampleTypeId,
+                            volumeMl: dto.volumeMl,
+                            collectionDatetime: new Date(dto.collectionDatetime),
+                            collectedByUserId: userId,
+                            laboratoryId,
+                            expirationDate: dto.expirationDate ? new Date(dto.expirationDate) : null,
+                            notes: dto.notes ? `${dto.notes} (Filho ${i} de ${childCount})` : `Amostra filha ${i} de ${childCount}`,
+                            status: SampleStatus.COLLECTED,
+                            isMotherSample: false,
+                            childCount: 0,
+                            parentSampleId: newSample.id,
+                            childNumber: i,
+                        },
+                    });
+
+                    // Create movement record for child
+                    await tx.sampleMovement.create({
+                        data: {
+                            sampleId: childSample.id,
+                            laboratoryId,
+                            newStatus: childSample.status,
+                            performedByUserId: userId,
+                            reason: `Child sample ${i} of ${childCount} created from mother ${dto.barcode}`,
+                        },
+                    });
+                }
+            }
+
             // Log to audit
             await tx.auditLog.create({
                 data: {
@@ -206,7 +251,10 @@ export class SampleService {
                     entityType: 'sample',
                     entityId: newSample.id,
                     action: 'create',
-                    newValues: newSample as unknown as Prisma.JsonObject,
+                    newValues: {
+                        ...newSample as unknown as Prisma.JsonObject,
+                        childrenCreated: childCount,
+                    },
                 },
             });
 

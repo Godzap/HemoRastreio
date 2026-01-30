@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsUUID, IsNumber, IsDateString, IsEnum, MaxLength, Min } from 'class-validator';
+import { IsString, IsOptional, IsUUID, IsNumber, IsDateString, IsEnum, MaxLength, Min, IsBoolean } from 'class-validator';
 import { SampleStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 
@@ -44,6 +44,16 @@ export class CreateSampleDto {
     @IsString()
     @IsOptional()
     notes?: string;
+
+    @IsOptional()
+    @Type(() => Boolean)
+    isMotherSample?: boolean;
+
+    @IsNumber()
+    @IsOptional()
+    @Min(1)
+    @Type(() => Number)
+    childCount?: number;
 }
 
 export class UpdateSampleDto {

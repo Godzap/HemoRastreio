@@ -125,6 +125,32 @@ export class AuthService {
     }
 
     async login(loginDto: LoginDto): Promise<LoginResponse> {
+        // ⚠️ BYPASS TEMPORÁRIO - BANCO DE DADOS EM MANUTENÇÃO ⚠️
+        // TODO: REVERTER QUANDO O BANCO VOLTAR!
+        // Comentar o bloco abaixo e descomentar a lógica original
+
+        console.log(`[AuthDebug] MODO DE TESTE ATIVO - Login bypass para: ${loginDto.username}`);
+
+        // Usuário mockado para testes
+        const mockUser: AuthenticatedUser = {
+            id: 'mock-user-id-12345',
+            username: loginDto.username,
+            email: `${loginDto.username}@teste.com`,
+            fullName: 'Usuário de Teste',
+            laboratoryId: 'mock-lab-id-12345',
+            isGlobalAdmin: true, // Acesso total para testes
+            roles: ['admin', 'technician', 'supervisor'],
+            permissions: ['read', 'write', 'delete', 'manage_users', 'manage_samples', 'manage_inventory'],
+        };
+
+        const tokens = await this.generateTokens(mockUser);
+
+        return {
+            user: mockUser,
+            tokens,
+        };
+
+        /* LÓGICA ORIGINAL - DESCOMENTAR QUANDO O BANCO VOLTAR
         const user = await this.validateUser(loginDto.username, loginDto.password);
 
         if (!user) {
@@ -150,6 +176,7 @@ export class AuthService {
             user,
             tokens,
         };
+        */
     }
 
     async refreshTokens(refreshToken: string): Promise<TokenPair> {
